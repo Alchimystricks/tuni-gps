@@ -1,0 +1,105 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 # This TUni-GPS module reconstructs absolute space-time action under distortion.\
+# It demonstrates core principles of the Continuity Theory.\
+# Author: J\'f6rg Geisbauer\
+# Version: 2.1\
+\
+import math\
+\
+# Physical constant\
+C = 299792458  # Speed of light in m/s\
+\
+class TUniEvent:\
+    """Defines the source event, particularly its energy."""\
+    def __init__(self, energy):\
+        if energy <= 0:\
+            raise ValueError("Energy must be positive.")\
+        self.energy = energy\
+\
+class TUniSat:\
+    """Models a single, distorted observational perspective."""\
+    def __init__(self, signal, measured_time, measured_pos, context, observer_active=True):\
+        self.signal = signal\
+        self.measured_time = measured_time\
+        self.measured_pos = measured_pos\
+        self.observer_active = observer_active\
+        self.context = context\
+        self.energy = self.signal.get("energy", 1.0)\
+        self.scale = self.energy * 1e10\
+\
+    def calculate_time_distortion(self):\
+        doppler = self.signal.get("doppler", 0.0)\
+        grav_shift = self.context.get("gravitational_influence", 0.0)\
+        return doppler + grav_shift\
+\
+    def calculate_position_distortion(self):\
+        return self.context.get("plasma_noise", 0.0)\
+\
+    def get_reconstructed_time(self):\
+        return self.measured_time - self.calculate_time_distortion()\
+\
+    def get_reconstructed_position(self):\
+        time_distortion = self.calculate_time_distortion()\
+        factor = 1 - (time_distortion * C) / self.scale\
+        corrected_pos = [coord * factor for coord in self.measured_pos]\
+        return [coord - self.calculate_position_distortion() for coord in corrected_pos]\
+\
+    def third_observer_analysis(self):\
+        if not self.observer_active:\
+            return None\
+        delta = self.measured_time - self.get_reconstructed_time()\
+        return \{"Difference": delta if delta != 0 else 1e-12\}\
+\
+class TUniSystem:\
+    """Merges multiple perspectives into an objective, weighted result."""\
+    def __init__(self, satellite_list):\
+        self.sats = [s for s in satellite_list if s.observer_active]\
+        if not self.sats:\
+            raise ValueError("System requires at least one active observer for analysis.")\
+\
+    def get_joint_reconstruction(self):\
+        observer_results = [sat.third_observer_analysis() for sat in self.sats]\
+        weights = [1 / abs(res['Difference']) for res in observer_results]\
+        total_weight = sum(weights)\
+\
+        positions = [sat.get_reconstructed_position() for sat in self.sats]\
+        times = [sat.get_reconstructed_time() for sat in self.sats]\
+\
+        weighted_time = sum(t * w for t, w in zip(times, weights)) / total_weight\
+        weighted_pos_x = sum(p[0] * w for p, w in zip(positions, weights)) / total_weight\
+        weighted_pos_y = sum(p[1] * w for p, w in zip(positions, weights)) / total_weight\
+        weighted_pos_z = sum(p[2] * w for p, w in zip(positions, weights)) / total_weight\
+\
+        return \{\
+            "reconstructed_position": [weighted_pos_x, weighted_pos_y, weighted_pos_z],\
+            "reconstructed_time": weighted_time\
+        \}\
+\
+if __name__ == "__main__":\
+    event = TUniEvent(energy=42.0)\
+    sat1 = TUniSat(\
+        signal=\{"doppler": 0.004, "energy": event.energy\}, \
+        measured_time=39877.123456, \
+        measured_pos=[12000.0, 14500.0, 2000.0], \
+        context=\{"gravitational_influence": 0.002, "plasma_noise": 0.001\}\
+    )\
+    sat2 = TUniSat(\
+        signal=\{"doppler": 0.0051, "energy": event.energy\}, \
+        measured_time=39877.123860, \
+        measured_pos=[12001.0, 14499.0, 2000.0], \
+        context=\{"gravitational_influence": 0.0025, "plasma_noise": 0.0012\}\
+    )\
+    gps_system = TUniSystem([sat1, sat2])\
+    result = gps_system.get_joint_reconstruction()\
+    total_action = event.energy * result["reconstructed_time"]\
+\
+    print("--- TUni-GPS Framework v2.1 Result ---")\
+    print(f"Reconstructed Position (weighted): \{[round(p, 4) for p in result['reconstructed_position']]\}")\
+    print(f"Reconstructed TUni-Time (weighted): \{result['reconstructed_time']:.6f\} s")\
+    print(f"Action of the Event (S = E \'d7 T_uni): \{total_action:.4f\}")}
